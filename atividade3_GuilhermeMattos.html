@@ -39,7 +39,9 @@ for (var i=0; i<7; i++)
   for (var j=0; j<7; j++)
   {
     var slot= new THREE.Mesh( slot_geo, (i+j)%2?mat_clear:mat_dark);
-	slot.is_clear=(i+j)%2;
+	slot.is_clear=0;
+    if(i==0&&j==2)
+        slot.is_clear = 1;
     if((i!= 0||j!=1)&&(i!=0||j!=0)&&(i!=1||j!=0)&&(i!=0||j!=5)&&(i!=0||j!=6)&&(i!=1||j!=6)&&(i!= 5||j!=0)&&(i!=6||j!=0)&&(i!=6||j!=1)&&(i!=6||j!=5)&&(i!=5||j!=6)&&(i!=6||j!=6)){
         slot.position.x= i;
 	    slot.position.y= j;
@@ -155,32 +157,43 @@ function state_update(event) {
     intersects = raycaster.intersectObjects(slots)
 	if (intersects.length) {
 	    target_slot=intersects[0].object;
-    	if (!target_slot.is_clear && !target_slot.piece) { 
-		  target_slot.material=mat_highlight;
-		  grab_x=target_slot.position.x;
-		  grab_y=target_slot.position.y;
+    	if (target_slot.is_clear && !target_slot.piece) {
+            origin_slot = grab.slot;
+            if(((grab.position.x==target_slot.position.x+2)&&(grab.position.y==target_slot.position.y))||((grab.position.y==target_slot.position.y+2)&&(grab.position.x==target_slot.position.x))){
+		        target_slot.material=mat_highlight;
+		        grab_x=target_slot.position.x;
+		        grab_y=target_slot.position.y;
+            }
 		}
 	}
   }
   
   if (event.type=='mouseup' && state=='grab')
   {
+    console.log("0 if");
     console.log(event.type);
     intersects = raycaster.intersectObjects(slots)
 	if (intersects.length) {
 	    target_slot=intersects[0].object;
-    	if (!target_slot.is_clear && !target_slot.piece) {
-          origin_slot=grab.slot
-          origin_slot.piece=null;
-          target_slot.piece=grab;		  
-		  grab.slot=target_slot;
-		  grab.position.x=target_slot.position.x;
-		  grab.position.y=target_slot.position.y;
-		  grab.position.z=0.5;
-          state='preselect'
-		  anim_time=0;
-		  grab=null;
-		  return; // sempre retornar se mudou de estado
+        console.log("primeiro if");
+    	if (target_slot.is_clear && !target_slot.piece) {
+            console.log("2 if");
+            if(((origin_slot.position.x==target_slot.position.x+2)&&(origin_slot.position.y==target_slot.position.y))||((origin_slot.position.y==target_slot.position.y+2)&&(origin_slot.position.x==target_slot.position.x))){
+                console.log("3 if");
+                origin_slot = grab.slot;
+                origin_slot.piece=null;
+                target_slot.piece=grab;
+                origin_slot.is_clear = 1;
+                target_slot.is_clear = 0;		  
+		        grab.slot=target_slot;
+		        grab.position.x=target_slot.position.x;
+		        grab.position.y=target_slot.position.y;
+		        grab.position.z=0.5;
+                state='preselect'
+		        anim_time=0;
+		        grab=null;
+		        return; // sempre retornar se mudou de estado
+            }
 		}
 	}
 	state='preselect'
