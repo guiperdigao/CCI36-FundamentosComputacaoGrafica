@@ -1,0 +1,198 @@
+
+<!-- Licensed under a BSD license. See license.html for license -->
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+    <title>Atividade 4 - Guilherme Mattos</title>
+    <style>
+    body {
+        margin: 0;
+    }
+    #c {
+        width: 100vw;
+        height: 100vh;
+        display: block;
+    }
+    </style>
+  </head>
+  <body>
+    <canvas id="c"></canvas>
+  </body>
+  <script src="js/three.min.js"></script>
+  <script id="vertexShader" type="x-shader/x-vertex">
+    varying vec2 vUv;
+    void main() {
+      vUv = uv;
+      gl_Position = projectionMatrix * modelViewMatrix * vec4( position, 1.0 );
+    }
+</script>
+<script id="fragmentShader" type="x-shader/x-fragment">
+  
+    uniform vec3 iResolution;
+    uniform float iTime;
+    uniform sampler2D iChannel0;
+    varying vec2 vUv;
+  
+    // By Daedelus: https://www.shadertoy.com/user/Daedelus
+    // license: Creative Commons Attribution-NonCommercial-ShareAlike 3.0 Unported License.
+    #define TIMESCALE 0.25 
+    #define TILES 8
+    #define COLOR 0.7, 1.6, 2.8
+  
+    void mainImage( out vec4 fragColor, in vec2 fragCoord )
+    {
+        // get screen uvs
+        vec2 uv = fragCoord.xy / iResolution.xy;
+        
+        // center
+        uv -= 0.5;
+        vec2 uv2 = uv;
+        
+        // correct aspect ratio
+        float ar = iResolution.x / iResolution.y;
+        uv.x *= ar;
+        
+        // measure distance from center
+        float dd = dot(uv, uv);
+        float dd2 = dot(uv2, uv2);
+    
+        // warp
+        uv = (uv * dd) * 0.4 + uv * 0.6;
+        uv2 = (uv2 * dd2) * 0.4 + uv2 * 0.6;
+    
+        //compute vignette
+        float vignette = (1.0 - abs(uv2.x)) * (1.0 - abs(uv2.y)) / (1.0 + dd2);
+        vignette *= vignette * 2.0;
+        vignette *= max(0.0, 1.0 - 2.75 * max(abs(uv2.x), abs(uv2.y)));
+        vignette = pow(vignette, 0.25);
+    
+        // restore
+        uv += 0.5;
+        uv2 += 0.5;
+    
+        // sample texture
+        vec4 color = texture2D(iChannel0, uv2);
+        // debug checker with aspect ratio correction
+        // float a = mod(uv.x * 20.0, 2.0);
+        // float b = mod(uv.y * 20.0, 2.0);
+        // float c = 0.3;
+        // if(int(a) != int(b))
+        //    c = 0.7;
+    
+        // apply vertical scanlines 
+        float v = abs(sin(uv.x * 270.0 + iTime * 3.0));
+        v += abs(sin(uv.x * 380.0 + iTime * 1.1));
+        v *= abs(sin(uv.x * 300.0 + iTime * 1.8));
+        v = mix(v, 0.5, 0.9) - 0.1;
+        // overlay
+        if(v > 0.5)
+            color = 1.0 - (1.0 - 2.0 * (v - 0.5)) * (1.0 - color);
+        else
+            color = (2.0 * v) * color;
+    
+        // apply vignette
+        color *= vignette;
+    
+        fragColor = color;
+    }
+  
+    void main() {
+      mainImage(gl_FragColor, vUv * iResolution.xy);
+    }
+  </script>
+<script>
+
+/* global THREE */
+
+function main() {
+  const canvas = document.querySelector('#c');
+  const renderer = new THREE.WebGLRenderer({canvas});
+
+  const fov = 75;
+  const aspect = 2;  // the canvas default
+  const near = 0.1;
+  const far = 5;
+  const camera = new THREE.PerspectiveCamera(fov, aspect, near, far);
+  camera.position.z = 2;
+
+  const scene = new THREE.Scene();
+  const geometry1 = new THREE.DodecahedronGeometry(0.6);
+  const geometry2 = new THREE.IcosahedronGeometry(0.6);
+  const geometry3 = new THREE.BoxGeometry(0.8,0.8,0.8);
+  
+  const loader = new THREE.TextureLoader();
+  const texture = loader.load('ita.PNG');
+  texture.minFilter = THREE.NearestFilter;
+  texture.magFilter = THREE.NearestFilter;
+  texture.wrapS = THREE.RepeatWrapping;
+  texture.wrapT = THREE.RepeatWrapping;
+  const uniforms = {
+    iTime: { value: 0 },
+    iResolution:  { value: new THREE.Vector3(1, 1, 1) },
+    iChannel0: { value: texture },
+  };
+
+  const material = new THREE.ShaderMaterial({
+    vertexShader: document.getElementById( 'vertexShader' ).textContent,
+    fragmentShader: document.getElementById( 'fragmentShader' ).textContent,
+    uniforms,
+  });
+
+  function criarObjeto(geometry, x) {
+    const objeto = new THREE.Mesh(geometry, material);
+    scene.add(objeto);
+
+    objeto.position.x = x;
+
+    return objeto;
+  }
+
+  const objetos = [
+    criarObjeto(geometry1, 0),
+    criarObjeto(geometry2,-2),
+    criarObjeto(geometry3, 2),
+  ];
+
+  function resizeRendererToDisplaySize(renderer) {
+    const canvas = renderer.domElement;
+    const width = canvas.clientWidth;
+    const height = canvas.clientHeight;
+    const needResize = canvas.width !== width || canvas.height !== height;
+    if (needResize) {
+      renderer.setSize(width, height, false);
+    }
+    return needResize;
+  }
+
+  function render(time) {
+    time *= 0.001;  // convert to seconds
+
+    if (resizeRendererToDisplaySize(renderer)) {
+      const canvas = renderer.domElement;
+      camera.aspect = canvas.clientWidth / canvas.clientHeight;
+      camera.updateProjectionMatrix();
+    }
+
+    objetos.forEach((objeto) => {
+      const speed = 0.05;
+      const rot = time * speed;
+      objeto.rotation.y = 0;
+      objeto.rotation.z = rot;
+    });
+
+    uniforms.iTime.value = time;
+
+    renderer.render(scene, camera);
+
+    requestAnimationFrame(render);
+  }
+
+  requestAnimationFrame(render);
+}
+
+main();
+</script>
+</html>
+
